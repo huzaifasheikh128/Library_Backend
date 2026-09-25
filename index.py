@@ -13,7 +13,19 @@ def get_db():
         raise RuntimeError("Database credentials missing. Please add them in Vercel.")
     return libsql_client.create_client_sync(url=URL, auth_token=TOKEN)
 
-def setup_database():
+class Book(BaseModel):
+    title: str
+    author: str
+    isbn: str
+    published_year: int
+
+@app.get("/")
+def read_root():
+    return {"status": "Library API is live"}
+
+# FIX: Moved database creation to an explicit GET route to prevent Vercel startup deadlocks
+@app.get("/setup-database")
+def setup_database_route():
     client = get_db()
     client.execute('''
         CREATE TABLE IF NOT EXISTS books (
@@ -26,22 +38,7 @@ def setup_database():
         )
     ''')
     client.close()
-
-# FIX 1: Safely trigger database setup only AFTER the server has fully booted
-@app.on_event("startup")
-def startup_event():
-    if URL and TOKEN:
-        setup_database()
-
-class Book(BaseModel):
-    title: str
-    author: str
-    isbn: str
-    published_year: int
-
-@app.get("/")
-def read_root():
-    return {"status": "Library API is live"}
+    return {"status": "Success", "message": "Database tables verified/created."}
 
 @app.get("/books/search")
 def search_books(q: str):
@@ -51,8 +48,6 @@ def search_books(q: str):
         SELECT * FROM books 
         WHERE title LIKE ? OR author LIKE ?
     ''', [search_pattern, search_pattern])
-    
-    # FIX 2: Fixed the missing list comprehension loop for 'row'
     records = [dict(zip(result.columns, row)) for row in result.rows]
     client.close()
     return records
