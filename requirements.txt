@@ -1,2 +1,4 @@
 fastapi
-libsql-client>=0.14.0
+uvicorn
+pydantic
+libsql-client
