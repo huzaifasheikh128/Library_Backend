@@ -27,8 +27,11 @@ def setup_database():
     ''')
     client.close()
 
-if URL and TOKEN:
-    setup_database()
+# FIX 1: Safely trigger database setup only AFTER the server has fully booted
+@app.on_event("startup")
+def startup_event():
+    if URL and TOKEN:
+        setup_database()
 
 class Book(BaseModel):
     title: str
@@ -48,7 +51,9 @@ def search_books(q: str):
         SELECT * FROM books 
         WHERE title LIKE ? OR author LIKE ?
     ''', [search_pattern, search_pattern])
-    records = [dict(zip(result.columns, row))] if result.rows else []
+    
+    # FIX 2: Fixed the missing list comprehension loop for 'row'
+    records = [dict(zip(result.columns, row)) for row in result.rows]
     client.close()
     return records
 
